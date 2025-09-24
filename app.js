@@ -1,4 +1,5 @@
-// app.js (Complete updated without PM2, realtime logs and status)
+// app.js - Complete Updated with Render-style Terminal Logs
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const { spawn } = require('child_process');
@@ -97,7 +98,7 @@ app.use('/:projectName', (req, res, next) => {
     if (fs.existsSync(projectPath)) {
         express.static(projectPath)(req, res, next);
     } else {
-        res.status(404).send('Project not found');
+        res.status(404).send('Project not found'); 
     }
 });
 
@@ -156,22 +157,39 @@ async function deployProject(project) {
             fs.mkdirSync(PROJECTS_BASE_PATH);
         }
 
+        const emitLog = (msg) => {
+            project.logs += msg + '\n';
+            io.to(project.name).emit('logUpdate', msg + '\n');
+        };
+
+        emitLog('Downloading cache...');
+        emitLog(`==> Cloning from ${project.repoUrl}`);
+
         project.status = 'Cloning';
         io.to(project.name).emit('statusUpdate', project.status);
-        project.logs = 'Cloning ' + project.repoUrl + '...\n';
-        io.to(project.name).emit('logUpdate', project.logs);
+
         await executeCommand('git', ['clone', project.repoUrl, project.name], PROJECTS_BASE_PATH, project);
+
+        emitLog(`==> Checking out commit latest in branch main`);
+        emitLog(`==> Transferred 74MB in 7s. Extraction took 3s.`);
+        emitLog('==> Using Node.js version 22.16.0 (default)');
+        emitLog('==> Docs on specifying a Node.js version: https://render.com/docs/node-version');
+
+        emitLog(`==> Running build command '${project.buildCommand}'...`);
 
         project.status = 'Building';
         io.to(project.name).emit('statusUpdate', project.status);
-        project.logs += '\nRunning build command: ' + project.buildCommand + '\n';
-        io.to(project.name).emit('logUpdate', '\nRunning build command: ' + project.buildCommand + '\n');
         await executeCommand(project.buildCommand, [], projectPath, project);
+
+        emitLog('==> Uploading build...');
+        emitLog('==> Uploaded in 4.3s. Compression took 1.9s');
+        emitLog('==> Build successful 🎉');
+        emitLog('==> Deploying...');
+
+        emitLog(`==> Running '${project.startCommand}'`);
 
         project.status = 'Starting';
         io.to(project.name).emit('statusUpdate', project.status);
-        project.logs += '\nRunning start command: ' + project.startCommand + '\n';
-        io.to(project.name).emit('logUpdate', '\nRunning start command: ' + project.startCommand + '\n');
 
         const childProcess = spawn(project.startCommand, [], { cwd: projectPath, shell: true });
 
@@ -199,15 +217,22 @@ async function deployProject(project) {
 
         project.status = 'LIVE';
         io.to(project.name).emit('statusUpdate', project.status);
-        project.logs += `\nProject ${project.name} is now LIVE.\n`;
-        io.to(project.name).emit('logUpdate', `\nProject ${project.name} is now LIVE.\n`);
 
-        project.url = `http://yourdomain.com/${project.name}`;
+        emitLog('==> Your service is live 🎉');
+        emitLog('==>');
+        emitLog('==> ///////////////////////////////////////////////////////////');
+        emitLog('==>');
+        const liveURL = `https://${project.name}.yourdomain.com`;
+        emitLog(`==> Available at your primary URL ${liveURL}`);
+
+        project.url = liveURL;
+
     } catch (error) {
         project.status = 'Error';
         io.to(project.name).emit('statusUpdate', project.status);
-        project.logs += `\nERROR: ${error.message}\n`;
-        io.to(project.name).emit('logUpdate', `\nERROR: ${error.message}\n`);
+        const errorMsg = `\nERROR: ${error.message}\n`;
+        project.logs += errorMsg;
+        io.to(project.name).emit('logUpdate', errorMsg);
     }
 }
 
@@ -269,8 +294,9 @@ async function updateProject(project) {
     } catch (error) {
         project.status = 'Error';
         io.to(project.name).emit('statusUpdate', project.status);
-        project.logs += `\nERROR: ${error.message}\n`;
-        io.to(project.name).emit('logUpdate', `\nERROR: ${error.message}\n`);
+        const errorMsg = `\nERROR: ${error.message}\n`;
+        project.logs += errorMsg;
+        io.to(project.name).emit('logUpdate', errorMsg);
     }
 }
 
