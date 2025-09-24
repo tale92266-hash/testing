@@ -1,4 +1,4 @@
-<!-- views/project.ejs -->
+<!-- views/project.ejs - Full Updated for live terminal logs and status -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -215,7 +215,7 @@
         </form>
     </div>
 
-    <div class="logs-section" id="logsContainer" aria-live="polite" aria-atomic="true" role="log"></div>
+    <div id="logsContainer" class="logs-section" aria-live="polite" aria-atomic="true" role="log"></div>
 </main>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -236,26 +236,16 @@
         if (!statusBadge) return;
         statusBadge.textContent = newStatus.toUpperCase();
 
-        // Clear previous classes
         statusBadge.className = 'status-badge';
-
-        // Add new status class and icon
         statusBadge.classList.add('status-' + newStatus.toLowerCase());
 
         let iconHTML = '';
         switch(newStatus) {
-            case 'LIVE':
-                iconHTML = '<i class="fas fa-circle"></i>';
-                break;
+            case 'LIVE': iconHTML = '<i class="fas fa-circle"></i>'; break;
             case 'Building':
-            case 'Pending':
-                iconHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                break;
-            case 'Error':
-                iconHTML = '<i class="fas fa-exclamation-triangle"></i>';
-                break;
-            default:
-                iconHTML = '';
+            case 'Pending': iconHTML = '<i class="fas fa-spinner fa-spin"></i>'; break;
+            case 'Error': iconHTML = '<i class="fas fa-exclamation-triangle"></i>'; break;
+            default: iconHTML = '';
         }
         statusBadge.innerHTML = iconHTML + ' ' + newStatus.toUpperCase();
     });
