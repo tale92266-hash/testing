@@ -102,17 +102,16 @@ app.post('/webhook', (req, res) => {
     }
 });
 
-// Fixed static file serving logic
+// Fixed: Correctly use express.static as middleware
 app.use('/:projectName', (req, res, next) => {
     const projectName = req.params.projectName;
-    
-    // Skip main routes
-    const mainRoutes = ['', 'deploy', 'webhook', 'project', 'delete-project'];
-    if (mainRoutes.includes(projectName)) return next();
+    const project = projects.find(p => p.name === projectName);
+
+    if (!project) {
+        return next();
+    }
 
     const projPath = path.join(PROJECTS_BASE_PATH, projectName);
-    
-    // Check for common build directories first
     let servePath = projPath;
     if (fs.existsSync(path.join(projPath, 'build'))) {
         servePath = path.join(projPath, 'build');
@@ -120,14 +119,32 @@ app.use('/:projectName', (req, res, next) => {
         servePath = path.join(projPath, 'dist');
     }
 
-    if (fs.existsSync(servePath)) {
-        express.static(servePath)(req, res, err => {
-            if (err) {
-                res.status(404).send('File not found');
-            }
-        });
+    const staticHandler = express.static(servePath);
+    staticHandler(req, res, next);
+});
+
+// Fixed: SPA Fallback for projects that use client-side routing
+app.get('/:projectName/*', (req, res, next) => {
+    const projectName = req.params.projectName;
+    const project = projects.find(p => p.name === projectName);
+
+    if (!project) {
+        return next();
+    }
+    
+    const projPath = path.join(PROJECTS_BASE_PATH, projectName);
+    let servePath = projPath;
+    if (fs.existsSync(path.join(projPath, 'build'))) {
+        servePath = path.join(projPath, 'build');
+    } else if (fs.existsSync(path.join(projPath, 'dist'))) {
+        servePath = path.join(projPath, 'dist');
+    }
+
+    const indexFile = path.join(servePath, 'index.html');
+    if (fs.existsSync(indexFile)) {
+        res.sendFile(indexFile);
     } else {
-        res.status(404).send('Project not found');
+        res.status(404).send('File not found in build directory');
     }
 });
 
@@ -213,69 +230,92 @@ async function deployProject(project) {
     project.path = projectPath;
 
     try {
+        // Add git clone timing fix
+        if (fs.existsSync(projectPath)) {
+            fs.rmdirSync(projectPath, { recursive: true });
+        }
+
         if (!fs.existsSync(PROJECTS_BASE_PATH)) {
             fs.mkdirSync(PROJECTS_BASE_PATH, { recursive: true });
         }
 
-        // Removed hardcoded "Cloning from..." message. Real output will be streamed.
+        const emitLog = msg => {
+            project.logs += msg + '\n';
+            io.to(project.name).emit('logUpdate', msg + '\n');
+            appendLogToFile(project.path, msg + '\n');
+        };
+
+        emitLog(`==> Cloning from ${project.repoUrl}`);
         project.status = 'Cloning';
         io.to(project.name).emit('statusUpdate', project.status);
         await executeCommand('git', ['clone', project.repoUrl, project.name], PROJECTS_BASE_PATH, project);
 
-        // Removed hardcoded "Running build command..." message. Real output will be streamed.
+        emitLog(`==> Running build command: '${project.buildCommand}'`);
         project.status = 'Building';
         io.to(project.name).emit('statusUpdate', project.status);
         await executeCommand(project.buildCommand, [], projectPath, project);
-        
-        // Removed hardcoded "Build successful..." message.
-        
-        // Removed hardcoded "Running start command..." message. Real output will be streamed.
-        project.status = 'Starting';
-        io.to(project.name).emit('statusUpdate', project.status);
-        const port = findAvailablePort();
-        project.port = port;
-        const env = {...process.env, PORT: port.toString()};
-        const childProcess = spawn(project.startCommand, [], { 
-            cwd: projectPath, 
-            shell: true, 
-            env 
-        });
+        emitLog('==> Build successful 🎉');
 
-        childProcess.stdout.on('data', data => {
-            const msg = data.toString();
-            project.logs += msg;
-            io.to(project.name).emit('logUpdate', msg);
-            appendLogToFile(project.path, msg);
-        });
+        // Check if the project is a front-end SPA (React/Vue) or a back-end app
+        // NOTE: This is a simplified check. A more robust solution would inspect package.json.
+        const isFrontendProject = project.startCommand.includes('serve -s') || project.startCommand.includes('npm start');
 
-        childProcess.stderr.on('data', data => {
-            const msg = `ERROR: ${data.toString()}`;
-            project.logs += msg;
-            io.to(project.name).emit('logUpdate', msg);
-            appendLogToFile(project.path, msg);
-        });
-
-        childProcess.on('close', code => {
-            if (code !== 0) {
-                const errMsg = `Start command exited with status ${code}\n`;
-                project.logs += errMsg;
-                io.to(project.name).emit('logUpdate', errMsg);
-                appendLogToFile(project.path, errMsg);
-                project.status = 'Error';
-                io.to(project.name).emit('statusUpdate', project.status);
-            }
-        });
-
-        setTimeout(() => {
+        if (isFrontendProject) {
+            emitLog(`==> Frontend project detected. Serving static files from 'build' or 'dist' directory.`);
             project.status = 'LIVE';
             io.to(project.name).emit('statusUpdate', project.status);
             const liveURL = `${BASE_DOMAIN}/${project.name}`;
-            project.logs += `\n==> Your service is live 🎉\n==> Available at your primary URL ${liveURL}\n\n`;
-            io.to(project.name).emit('logUpdate', `\n==> Your service is live 🎉\n==> Available at your primary URL ${liveURL}\n\n`);
-            appendLogToFile(project.path, `\n==> Your service is live 🎉\n==> Available at your primary URL ${liveURL}\n\n`);
+            emitLog(`==> Your service is live 🎉`);
+            emitLog(`==> Available at your primary URL ${liveURL}`);
             project.url = liveURL;
-        }, 2000);
+        } else {
+            // This is for backend Node.js applications
+            emitLog(`==> Running start command: '${project.startCommand}'`);
+            project.status = 'Starting';
+            io.to(project.name).emit('statusUpdate', project.status);
+            const port = findAvailablePort();
+            project.port = port;
+            const env = {...process.env, PORT: port.toString()};
+            const childProcess = spawn(project.startCommand, [], { 
+                cwd: projectPath, 
+                shell: true, 
+                env 
+            });
 
+            childProcess.stdout.on('data', data => {
+                const msg = data.toString();
+                project.logs += msg;
+                io.to(project.name).emit('logUpdate', msg);
+                appendLogToFile(project.path, msg);
+            });
+
+            childProcess.stderr.on('data', data => {
+                const msg = `ERROR: ${data.toString()}`;
+                project.logs += msg;
+                io.to(project.name).emit('logUpdate', msg);
+                appendLogToFile(project.path, msg);
+            });
+
+            childProcess.on('close', code => {
+                if (code !== 0) {
+                    const errMsg = `Start command exited with status ${code}\n`;
+                    project.logs += errMsg;
+                    io.to(project.name).emit('logUpdate', errMsg);
+                    appendLogToFile(project.path, errMsg);
+                    project.status = 'Error';
+                    io.to(project.name).emit('statusUpdate', project.status);
+                }
+            });
+
+            setTimeout(() => {
+                project.status = 'LIVE';
+                io.to(project.name).emit('statusUpdate', project.status);
+                const liveURL = `${BASE_DOMAIN}/${project.name}`;
+                emitLog(`==> Your service is live 🎉`);
+                emitLog(`==> Available at your primary URL ${liveURL}`);
+                project.url = liveURL;
+            }, 2000);
+        }
     } catch (error) {
         project.status = 'Error';
         io.to(project.name).emit('statusUpdate', project.status);
