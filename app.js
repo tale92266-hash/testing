@@ -1,4 +1,4 @@
-// app.js - Complete Updated with Render-style Terminal Logs
+// app.js - Complete Updated with Dynamic Port Starting at 3000 and Full Log Streaming
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -109,6 +109,18 @@ io.on('connection', (socket) => {
 });
 
 let projects = [];
+const USED_PORTS = new Set();
+
+const INITIAL_PORT = 3000;
+
+function findAvailablePort() {
+    let port = INITIAL_PORT;
+    while (USED_PORTS.has(port)) {
+        port++;
+    }
+    USED_PORTS.add(port);
+    return port;
+}
 
 function executeCommand(command, args, cwd, project) {
     return new Promise((resolve, reject) => {
@@ -191,7 +203,11 @@ async function deployProject(project) {
         project.status = 'Starting';
         io.to(project.name).emit('statusUpdate', project.status);
 
-        const childProcess = spawn(project.startCommand, [], { cwd: projectPath, shell: true });
+        const port = findAvailablePort();
+        project.port = port;
+        const env = {...process.env, PORT: port.toString()};
+
+        const childProcess = spawn(project.startCommand, [], { cwd: projectPath, shell: true, env });
 
         childProcess.stdout.on('data', (data) => {
             const logMessage = data.toString();
@@ -222,7 +238,7 @@ async function deployProject(project) {
         emitLog('==>');
         emitLog('==> ///////////////////////////////////////////////////////////');
         emitLog('==>');
-        const liveURL = `https://${project.name}.yourdomain.com`;
+        const liveURL = `https://${project.name}.yourdomain.com:${port}`;
         emitLog(`==> Available at your primary URL ${liveURL}`);
 
         project.url = liveURL;
@@ -263,7 +279,9 @@ async function updateProject(project) {
         project.logs += '\nRunning start command: ' + project.startCommand + '\n';
         io.to(project.name).emit('logUpdate', '\nRunning start command: ' + project.startCommand + '\n');
 
-        const childProcess = spawn(project.startCommand, [], { cwd: projectPath, shell: true });
+        const env = {...process.env, PORT: project.port.toString() || '3000'};
+
+        const childProcess = spawn(project.startCommand, [], { cwd: projectPath, shell: true, env });
 
         childProcess.stdout.on('data', (data) => {
             const logMessage = data.toString();
