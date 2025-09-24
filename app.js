@@ -1,4 +1,4 @@
-// app.js - Complete Updated with Dynamic Port Starting at 3000 and Full Log Streaming
+// app.js - Complete updated with 0.0.0.0 binding, persistent logs, domain fix, and full realtime logs
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -14,7 +14,12 @@ const { Server } = require("socket.io");
 const io = new Server(server);
 
 const PORT = process.env.PORT || 3001;
+const HOST = '0.0.0.0';  // to allow everywhere access
 const PROJECTS_BASE_PATH = path.join(__dirname, 'deployments');
+const LOGS_FILE_NAME = 'deployment-logs.txt';
+
+// Set your actual domain here:
+const BASE_DOMAIN = 'https://testing-ax07.onrender.com';
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -34,6 +39,17 @@ app.get('/project/:projectName', (req, res) => {
         return res.status(404).send('Project not found.');
     }
     res.render('project', { project });
+});
+
+app.get('/project/:projectName/logs', (req, res) => {
+    const project = projects.find(p => p.name === req.params.projectName);
+    if (!project) return res.status(404).send('Project not found.');
+
+    const logFilePath = path.join(project.path, LOGS_FILE_NAME);
+    fs.readFile(logFilePath, 'utf8', (err, data) => {
+        if (err) return res.status(500).send('Logs not found');
+        res.send(data);
+    });
 });
 
 app.post('/deploy', (req, res) => {
@@ -122,6 +138,13 @@ function findAvailablePort() {
     return port;
 }
 
+function appendLogToFile(projectPath, log) {
+    const logFilePath = path.join(projectPath, LOGS_FILE_NAME);
+    fs.appendFile(logFilePath, log, (err) => {
+        if (err) console.error('Failed to write logs to file', err);
+    });
+}
+
 function executeCommand(command, args, cwd, project) {
     return new Promise((resolve, reject) => {
         try {
@@ -131,14 +154,25 @@ function executeCommand(command, args, cwd, project) {
                 const logMessage = data.toString();
                 project.logs += logMessage;
                 io.to(project.name).emit('logUpdate', logMessage);
+                appendLogToFile(project.path, logMessage);
                 console.log(logMessage.trim());
             });
 
             cmd.stderr.on('data', (data) => {
-                const logMessage = `ERROR: ${data.toString()}`;
-                project.logs += logMessage;
-                io.to(project.name).emit('logUpdate', logMessage);
-                console.error(logMessage.trim());
+                const text = data.toString();
+
+                if (text.toLowerCase().includes('error') || text.toLowerCase().includes('fatal')) {
+                    const logMessage = `ERROR: ${text}`;
+                    project.logs += logMessage;
+                    io.to(project.name).emit('logUpdate', logMessage);
+                    appendLogToFile(project.path, logMessage);
+                    console.error(logMessage.trim());
+                } else {
+                    project.logs += text;
+                    io.to(project.name).emit('logUpdate', text);
+                    appendLogToFile(project.path, text);
+                    console.log(text.trim());
+                }
             });
 
             cmd.on('close', (code) => {
@@ -146,6 +180,7 @@ function executeCommand(command, args, cwd, project) {
                     const errorMessage = `Exited with status ${code}\n`;
                     project.logs += errorMessage;
                     io.to(project.name).emit('logUpdate', errorMessage);
+                    appendLogToFile(project.path, errorMessage);
                     reject(new Error(errorMessage));
                 } else {
                     resolve();
@@ -155,6 +190,7 @@ function executeCommand(command, args, cwd, project) {
             const errorMessage = `Command failed to start: ${error.message}\n`;
             project.logs += errorMessage;
             io.to(project.name).emit('logUpdate', errorMessage);
+            appendLogToFile(project.path, errorMessage);
             reject(new Error(errorMessage));
         }
     });
@@ -172,6 +208,7 @@ async function deployProject(project) {
         const emitLog = (msg) => {
             project.logs += msg + '\n';
             io.to(project.name).emit('logUpdate', msg + '\n');
+            appendLogToFile(project.path, msg + '\n');
         };
 
         emitLog('Downloading cache...');
@@ -213,12 +250,14 @@ async function deployProject(project) {
             const logMessage = data.toString();
             project.logs += logMessage;
             io.to(project.name).emit('logUpdate', logMessage);
+            appendLogToFile(project.path, logMessage);
         });
 
         childProcess.stderr.on('data', (data) => {
             const logMessage = `ERROR: ${data.toString()}`;
             project.logs += logMessage;
             io.to(project.name).emit('logUpdate', logMessage);
+            appendLogToFile(project.path, logMessage);
         });
 
         childProcess.on('close', (code) => {
@@ -226,6 +265,7 @@ async function deployProject(project) {
                 const errorMessage = `Start command exited with status ${code}\n`;
                 project.logs += errorMessage;
                 io.to(project.name).emit('logUpdate', errorMessage);
+                appendLogToFile(project.path, errorMessage);
                 project.status = 'Error';
                 io.to(project.name).emit('statusUpdate', project.status);
             }
@@ -238,7 +278,7 @@ async function deployProject(project) {
         emitLog('==>');
         emitLog('==> ///////////////////////////////////////////////////////////');
         emitLog('==>');
-        const liveURL = `https://${project.name}.yourdomain.com:${port}`;
+        const liveURL = `${BASE_DOMAIN}/${project.name}`;
         emitLog(`==> Available at your primary URL ${liveURL}`);
 
         project.url = liveURL;
@@ -249,6 +289,7 @@ async function deployProject(project) {
         const errorMsg = `\nERROR: ${error.message}\n`;
         project.logs += errorMsg;
         io.to(project.name).emit('logUpdate', errorMsg);
+        appendLogToFile(project.path, errorMsg);
     }
 }
 
@@ -287,12 +328,14 @@ async function updateProject(project) {
             const logMessage = data.toString();
             project.logs += logMessage;
             io.to(project.name).emit('logUpdate', logMessage);
+            appendLogToFile(project.path, logMessage);
         });
 
         childProcess.stderr.on('data', (data) => {
             const logMessage = `ERROR: ${data.toString()}`;
             project.logs += logMessage;
             io.to(project.name).emit('logUpdate', logMessage);
+            appendLogToFile(project.path, logMessage);
         });
 
         childProcess.on('close', (code) => {
@@ -300,6 +343,7 @@ async function updateProject(project) {
                 const errorMessage = `Start command exited with status ${code}\n`;
                 project.logs += errorMessage;
                 io.to(project.name).emit('logUpdate', errorMessage);
+                appendLogToFile(project.path, errorMessage);
                 project.status = 'Error';
                 io.to(project.name).emit('statusUpdate', project.status);
             }
@@ -315,9 +359,11 @@ async function updateProject(project) {
         const errorMsg = `\nERROR: ${error.message}\n`;
         project.logs += errorMsg;
         io.to(project.name).emit('logUpdate', errorMsg);
+        appendLogToFile(project.path, errorMsg);
     }
 }
 
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+server.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
+});
 });
