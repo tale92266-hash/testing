@@ -102,7 +102,7 @@ app.post('/webhook', (req, res) => {
     }
 });
 
-// FIXED: Serve project static files properly
+// Fixed static file serving logic
 app.use('/:projectName', (req, res, next) => {
     const projectName = req.params.projectName;
     
@@ -113,15 +113,9 @@ app.use('/:projectName', (req, res, next) => {
     const projPath = path.join(PROJECTS_BASE_PATH, projectName);
     
     if (fs.existsSync(projPath)) {
-        // Serve static files from the project directory
-        express.static(projPath, {
-            index: ['index.html', 'index.htm'],
-            dotfiles: 'ignore'
-        })(req, res, (err) => {
+        express.static(projPath)(req, res, err => {
             if (err) {
                 res.status(404).send('File not found');
-            } else {
-                next();
             }
         });
     } else {
