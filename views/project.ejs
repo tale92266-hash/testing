@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title><%= project.name %> - Project Details</title>
+<style>
+body { font-family: sans-serif; padding: 20px; background-color: #f4f4f9; }
+.container { max-width: 900px; margin: auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+.header { display: flex; justify-content: space-between; align-items: center; }
+h1 { color: #333; margin: 0; }
+.details-box { background-color: #e9ecef; padding: 15px; border-radius: 8px; margin-top: 20px; }
+.details-box p { margin: 5px 0; }
+.terminal { background-color: #212529; color: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; font-family: monospace; white-space: pre-wrap; word-wrap: break-word; overflow-y: scroll; height: 400px; }
+.btn-back { background-color: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 20px; }
+.btn-delete { background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 20px; }
+form { display: inline; }
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1><%= project.name %></h1>
+<span style="background-color: <%= project.status === 'LIVE' ? '#28a745' : project.status === 'Error' ? '#dc3545' : '#ffc107' %>; color: white; padding: 5px 10px; border-radius: 5px; font-weight: bold;"><%= project.status %></span>
+</div>
+    <div class="details-box">
+        <p><strong>Live URL:</strong> <a href="<%= project.url %>" target="_blank"><%= project.url %></a></p>
+        <p><strong>GitHub Repo:</strong> <a href="<%= project.repoUrl %>" target="_blank"><%= project.repoUrl %></a></p>
+    </div>
+
+    <div class="terminal">
+        <pre id="logs"><%= project.logs %></pre>
+    </div>
+
+    <a href="/" class="btn-back">Vapas Jayein</a>
+    <form action="/delete-project" method="post" onsubmit="return confirm('Kya aap is project ko pakka delete karna chahte hain?');">
+        <input type="hidden" name="projectName" value="<%= project.name %>">
+        <button type="submit" class="btn-delete">Is Project Ko Hatao</button>
+    </form>
+</div>
+
+<script>
+    const logsDiv = document.getElementById('logs');
+    logsDiv.scrollTop = logsDiv.scrollHeight;
+    
+    // Live log update functionality
+    function fetchLogs() {
+        fetch(window.location.href)
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newLogs = doc.getElementById('logs').innerHTML;
+                if (logsDiv.innerHTML !== newLogs) {
+                    logsDiv.innerHTML = newLogs;
+                    logsDiv.scrollTop = logsDiv.scrollHeight;
+                }
+            })
+            .catch(error => console.error('Error fetching logs:', error));
+    }
+
+    // Fetch logs every 2 seconds
+    setInterval(fetchLogs, 2000);
+</script>
+</body>
+</html>
