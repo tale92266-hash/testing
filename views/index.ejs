@@ -1,118 +1,43 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Simple Render</title>
 <style>
-body {
-font-family: 'Arial', sans-serif;
-background-color: #f0f2f5;
-color: #333;
-margin: 0;
-padding: 20px;
-}
-.container {
-max-width: 900px;
-margin: 0 auto;
-background-color: #fff;
-padding: 20px;
-border-radius: 8px;
-box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-}
-h1, h2 {
-color: #1a237e;
-}
-form {
-display: grid;
-gap: 15px;
-margin-bottom: 30px;
-}
-input, textarea {
-width: 100%;
-padding: 12px;
-border: 1px solid #ccc;
-border-radius: 6px;
-box-sizing: border-box;
-font-size: 16px;
-}
-button {
-background-color: #43a047;
-color: white;
-padding: 15px;
-border: none;
-border-radius: 6px;
-cursor: pointer;
-font-size: 18px;
-font-weight: bold;
-}
-button:hover {
-background-color: #388e3c;
-}
-.project-card {
-border: 1px solid #e0e0e0;
-padding: 20px;
-border-radius: 8px;
-margin-bottom: 20px;
-background-color: #fafafa;
-box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-}
-.project-card h3 {
-margin-top: 0;
-color: #0d47a1;
-}
-.project-card p {
-margin: 5px 0;
-line-height: 1.5;
-}
-.status {
-font-weight: bold;
-text-transform: capitalize;
-}
-.status.live { color: #4CAF50; }
-.status.building { color: #FFC107; }
-.status.error { color: #F44336; }
-pre {
-background-color: #263238;
-color: #eceff1;
-padding: 10px;
-border-radius: 6px;
-overflow-x: auto;
-white-space: pre-wrap;
-word-wrap: break-word;
-}
+body { font-family: sans-serif; padding: 20px; background-color: #f4f4f9; }
+.container { max-width: 800px; margin: auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+h1 { color: #333; text-align: center; }
+.project-list { list-style: none; padding: 0; }
+.project-item { background-color: #e9ecef; border-radius: 6px; margin-bottom: 10px; padding: 15px; display: flex; justify-content: space-between; align-items: center; transition: background-color 0.3s; }
+.project-item:hover { background-color: #dee2e6; }
+.project-name a { text-decoration: none; font-size: 1.2em; color: #007bff; font-weight: bold; }
+.project-status { font-weight: bold; padding: 5px 10px; border-radius: 5px; color: white; }
+.status-live { background-color: #28a745; }
+.status-pending { background-color: #ffc107; }
+.status-error { background-color: #dc3545; }
+.status-updating { background-color: #17a2b8; }
+.add-new { text-align: right; margin-bottom: 20px; }
+.add-new a { background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
+.no-projects { text-align: center; color: #6c757d; font-style: italic; }
 </style>
 </head>
 <body>
 <div class="container">
-<h1>Simple Render</h1>
-<p>यह एक परीक्षण संदेश है. अगर आपको यह दिख रहा है, तो वेबहुक काम कर रहा है!</p>
-<p>GitHub repository se app deploy karein.</p>
-    <form action="/deploy" method="POST">
-        <input type="text" name="projectName" placeholder="Project ka Naam" required>
-        <input type="text" name="repoUrl" placeholder="GitHub Repository URL" required>
-        <input type="text" name="buildCommand" placeholder="Build Command (jaise: npm install && npm run build)" required>
-        <input type="text" name="startCommand" placeholder="Start Command (jaise: npm start)" required>
-        <button type="submit">Deploy karein</button>
-    </form>
-
-    <hr>
-
-    <h2>Deployed Apps</h2>
-    <% if (projects.length === 0) { %>
-        <p>Abhi koi app deploy nahi kiya gaya hai.</p>
-    <% } %>
-    <% projects.forEach(project => { %>
-        <div class="project-card">
-            <h3><%= project.name %></h3>
-            <p><strong>URL:</strong> <%= project.url %></p>
-            <p><strong>Path:</strong> <%= project.path %></p>
-            <p><strong>Status:</strong> <span class="status <%= project.status.toLowerCase() %>"><%= project.status %></span></p>
-            <h4>Logs:</h4>
-            <pre><%= project.logs %></pre>
-        </div>
-    <% }); %>
+<h1>Render.com Jaisa Local Dashboard</h1>
+<div class="add-new">
+<a href="/project/add">Naya Project Jodein</a>
+</div>
+<% if (projects.length === 0) { %>
+<p class="no-projects">Abhi koi project deploy nahi hua hai.</p>
+<% } else { %>
+<ul class="project-list">
+<% projects.forEach(project => { %>
+<li class="project-item">
+<span class="project-name"><a href="/project/<%= project.name %>"><%= project.name %></a></span>
+<span class="project-status status-<%= project.status.toLowerCase() %>"><%= project.status %></span>
+</li>
+<% }); %>
+</ul>
+<% } %>
 </div>
 </body>
 </html>
-
