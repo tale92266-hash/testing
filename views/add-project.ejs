@@ -1,64 +1,332 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title><%= project.name %> - Project Details</title>
-<style>
-body { font-family: sans-serif; padding: 20px; background-color: #f4f4f9; }
-.container { max-width: 900px; margin: auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-.header { display: flex; justify-content: space-between; align-items: center; }
-h1 { color: #333; margin: 0; }
-.details-box { background-color: #e9ecef; padding: 15px; border-radius: 8px; margin-top: 20px; }
-.details-box p { margin: 5px 0; }
-.terminal { background-color: #212529; color: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; font-family: monospace; white-space: pre-wrap; word-wrap: break-word; overflow-y: scroll; height: 400px; }
-.btn-back { background-color: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 20px; }
-.btn-delete { background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 20px; }
-form { display: inline; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Project - DeployHub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            padding: 2rem 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .back-btn {
+            color: white;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            color: #74b9ff;
+            transform: translateX(-5px);
+        }
+
+        .form-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 2rem;
+            color: white;
+        }
+
+        .form-title {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            background: linear-gradient(45deg, #ffeaa7, #fdcb6e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #74b9ff;
+            box-shadow: 0 0 0 3px rgba(116, 185, 255, 0.2);
+        }
+
+        .form-group input::placeholder,
+        .form-group textarea::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .preset-commands {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .preset-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.8rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .preset-btn:hover {
+            background: rgba(116, 185, 255, 0.2);
+            border-color: #74b9ff;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: linear-gradient(45deg, #00b894, #00a085);
+            color: white;
+            padding: 1rem;
+            border: none;
+            border-radius: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 1rem;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 184, 148, 0.4);
+        }
+
+        .form-help {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 0.5rem;
+        }
+
+        .examples {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+        }
+
+        .examples h4 {
+            color: #74b9ff;
+            margin-bottom: 0.5rem;
+        }
+
+        .examples ul {
+            list-style: none;
+            padding-left: 1rem;
+        }
+
+        .examples li {
+            margin: 0.3rem 0;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .preset-commands {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
-<div class="container">
-<div class="header">
-<h1><%= project.name %></h1>
-<span style="background-color: <%= project.status === 'LIVE' ? '#28a745' : project.status === 'Error' ? '#dc3545' : '#ffc107' %>; color: white; padding: 5px 10px; border-radius: 5px; font-weight: bold;"><%= project.status %></span>
-</div>
-    <div class="details-box">
-        <p><strong>Live URL:</strong> <a href="<%= project.url %>" target="_blank"><%= project.url %></a></p>
-        <p><strong>GitHub Repo:</strong> <a href="<%= project.repoUrl %>" target="_blank"><%= project.repoUrl %></a></p>
+    <div class="container">
+        <a href="/" class="back-btn">
+            <i class="fas fa-arrow-left"></i>
+            Back to Dashboard
+        </a>
+
+        <div class="form-card">
+            <h1 class="form-title">
+                <i class="fas fa-plus-circle"></i>
+                Deploy New Project
+            </h1>
+
+            <form method="POST" action="/deploy">
+                <div class="form-group">
+                    <label for="projectName">
+                        <i class="fas fa-tag"></i>
+                        Project Name
+                    </label>
+                    <input 
+                        type="text" 
+                        id="projectName" 
+                        name="projectName" 
+                        required 
+                        placeholder="my-awesome-app"
+                        pattern="[a-zA-Z0-9-_]+"
+                        title="Only letters, numbers, hyphens and underscores allowed"
+                    >
+                    <div class="form-help">
+                        This will be used as the PM2 process name and folder name
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="repoUrl">
+                        <i class="fab fa-github"></i>
+                        GitHub Repository URL
+                    </label>
+                    <input 
+                        type="url" 
+                        id="repoUrl" 
+                        name="repoUrl" 
+                        required 
+                        placeholder="https://github.com/username/repository-name"
+                    >
+                    <div class="form-help">
+                        Make sure the repository is public or you have access
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="buildCommand">
+                        <i class="fas fa-hammer"></i>
+                        Build Command
+                    </label>
+                    <input 
+                        type="text" 
+                        id="buildCommand" 
+                        name="buildCommand" 
+                        required 
+                        placeholder="npm install"
+                    >
+                    
+                    <div class="preset-commands">
+                        <button type="button" class="preset-btn" onclick="setBuildCommand('npm install')">
+                            <i class="fab fa-npm"></i>
+                            npm install
+                        </button>
+                        <button type="button" class="preset-btn" onclick="setBuildCommand('npm install && npm run build')">
+                            <i class="fas fa-cogs"></i>
+                            npm install & build
+                        </button>
+                        <button type="button" class="preset-btn" onclick="setBuildCommand('yarn install')">
+                            <i class="fab fa-yarn"></i>
+                            yarn install
+                        </button>
+                        <button type="button" class="preset-btn" onclick="setBuildCommand('pip install -r requirements.txt')">
+                            <i class="fab fa-python"></i>
+                            pip install
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="startCommand">
+                        <i class="fas fa-play"></i>
+                        Start Command
+                    </label>
+                    <input 
+                        type="text" 
+                        id="startCommand" 
+                        name="startCommand" 
+                        required 
+                        placeholder="node server.js"
+                    >
+                    
+                    <div class="preset-commands">
+                        <button type="button" class="preset-btn" onclick="setStartCommand('node server.js')">
+                            <i class="fab fa-node-js"></i>
+                            node server.js
+                        </button>
+                        <button type="button" class="preset-btn" onclick="setStartCommand('node app.js')">
+                            <i class="fab fa-node-js"></i>
+                            node app.js
+                        </button>
+                        <button type="button" class="preset-btn" onclick="setStartCommand('npm start')">
+                            <i class="fab fa-npm"></i>
+                            npm start
+                        </button>
+                        <button type="button" class="preset-btn" onclick="setStartCommand('python app.py')">
+                            <i class="fab fa-python"></i>
+                            python app.py
+                        </button>
+                    </div>
+                </div>
+
+                <div class="examples">
+                    <h4><i class="fas fa-lightbulb"></i> Common Examples:</h4>
+                    <ul>
+                        <li><strong>Node.js/Express:</strong> Build: npm install | Start: node server.js</li>
+                        <li><strong>React App:</strong> Build: npm install && npm run build | Start: serve -s build</li>
+                        <li><strong>Next.js:</strong> Build: npm install && npm run build | Start: npm start</li>
+                        <li><strong>Python Flask:</strong> Build: pip install -r requirements.txt | Start: python app.py</li>
+                    </ul>
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    <i class="fas fa-rocket"></i>
+                    Deploy Project
+                </button>
+            </form>
+        </div>
     </div>
 
-    <div class="terminal">
-        <pre id="logs"><%= project.logs %></pre>
-    </div>
+    <script>
+        function setBuildCommand(command) {
+            document.getElementById('buildCommand').value = command;
+        }
 
-    <a href="/" class="btn-back">Vapas Jayein</a>
-    <form action="/delete-project" method="post" onsubmit="return confirm('Kya aap is project ko pakka delete karna chahte hain?');">
-        <input type="hidden" name="projectName" value="<%= project.name %>">
-        <button type="submit" class="btn-delete">Is Project Ko Hatao</button>
-    </form>
-</div>
+        function setStartCommand(command) {
+            document.getElementById('startCommand').value = command;
+        }
 
-<script>
-    const logsDiv = document.getElementById('logs');
-    logsDiv.scrollTop = logsDiv.scrollHeight;
-    
-    // Live log update functionality
-    function fetchLogs() {
-        fetch(window.location.href)
-            .then(response => response.text())
-            .then(html => {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                const newLogs = doc.getElementById('logs').innerHTML;
-                if (logsDiv.innerHTML !== newLogs) {
-                    logsDiv.innerHTML = newLogs;
-                    logsDiv.scrollTop = logsDiv.scrollHeight;
-                }
-            })
-            .catch(error => console.error('Error fetching logs:', error));
-    }
-
-    // Fetch logs every 2 seconds
-    setInterval(fetchLogs, 2000);
-</script>
+        // Auto-generate project name from repo URL
+        document.getElementById('repoUrl').addEventListener('input', function(e) {
+            const url = e.target.value;
+            const match = url.match(/github\.com\/[^\/]+\/([^\/]+)/);
+            if (match && !document.getElementById('projectName').value) {
+                const repoName = match[1].replace(/\.git$/, '');
+                document.getElementById('projectName').value = repoName;
+            }
+        });
+    </script>
 </body>
 </html>
