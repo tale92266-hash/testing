@@ -1,4 +1,4 @@
-// app.js - Complete fixed for static file serving and port override
+// app.js - Complete fixed for static file serving, port override, and real-time logs
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -209,14 +209,24 @@ async function deployProject(project) {
             fs.mkdirSync(PROJECTS_BASE_PATH, { recursive: true });
         }
 
+        const emitLog = msg => {
+            project.logs += msg + '\n';
+            io.to(project.name).emit('logUpdate', msg + '\n');
+            appendLogToFile(project.path, msg + '\n');
+        };
+
+        emitLog(`==> Cloning from ${project.repoUrl}`);
         project.status = 'Cloning';
         io.to(project.name).emit('statusUpdate', project.status);
         await executeCommand('git', ['clone', project.repoUrl, project.name], PROJECTS_BASE_PATH, project);
 
+        emitLog(`==> Running build command: '${project.buildCommand}'`);
         project.status = 'Building';
         io.to(project.name).emit('statusUpdate', project.status);
         await executeCommand(project.buildCommand, [], projectPath, project);
+        emitLog('==> Build successful 🎉');
 
+        emitLog(`==> Running start command: '${project.startCommand}'`);
         project.status = 'Starting';
         io.to(project.name).emit('statusUpdate', project.status);
         const port = findAvailablePort();
@@ -257,9 +267,8 @@ async function deployProject(project) {
             project.status = 'LIVE';
             io.to(project.name).emit('statusUpdate', project.status);
             const liveURL = `${BASE_DOMAIN}/${project.name}`;
-            project.logs += `\n==> Your service is live 🎉\n==> Available at your primary URL ${liveURL}\n\n`;
-            io.to(project.name).emit('logUpdate', `\n==> Your service is live 🎉\n==> Available at your primary URL ${liveURL}\n\n`);
-            appendLogToFile(project.path, `\n==> Your service is live 🎉\n==> Available at your primary URL ${liveURL}\n\n`);
+            emitLog(`==> Your service is live 🎉`);
+            emitLog(`==> Available at your primary URL ${liveURL}`);
             project.url = liveURL;
         }, 2000);
 
