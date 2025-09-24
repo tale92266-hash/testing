@@ -1,4 +1,4 @@
-// app.js
+// app.js (complete updated for realtime status and logs)
 const express = require('express');
 const bodyParser = require('body-parser');
 const { spawn } = require('child_process');
@@ -19,7 +19,6 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Serve main app routes first to avoid conflicts with project static serving
 app.get('/', (req, res) => {
     res.render('index', { projects });
 });
@@ -90,12 +89,10 @@ app.post('/webhook', (req, res) => {
     }
 });
 
-// New middleware to serve deployed projects' static files from root URL path
 app.use('/:projectName', (req, res, next) => {
     const projectName = req.params.projectName;
 
-    // List main app routes to avoid conflict
-    const mainRoutes = ['', 'deploy', 'webhook', 'project', 'delete-project', 'projectName', 'project']; 
+    const mainRoutes = ['', 'deploy', 'webhook', 'project', 'delete-project', 'projectName']; 
     if (mainRoutes.includes(projectName)) {
         return next();
     }
@@ -108,7 +105,6 @@ app.use('/:projectName', (req, res, next) => {
     }
 });
 
-// Socket.io for real-time logs and status streaming
 io.on('connection', (socket) => {
     socket.on('joinProjectRoom', (projectName) => {
         socket.join(projectName);
@@ -198,7 +194,7 @@ async function deployProject(project) {
         project.logs += `\nProject ${project.name} is now LIVE.\n`;
         io.to(project.name).emit('logUpdate', `\nProject ${project.name} is now LIVE.\n`);
 
-        project.url = `http://yourdomain.com/${project.name}`; // Change to your deployed domain
+        project.url = `http://yourdomain.com/${project.name}`;
     } catch (error) {
         project.status = 'Error';
         io.to(project.name).emit('statusUpdate', project.status);
