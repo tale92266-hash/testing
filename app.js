@@ -217,24 +217,19 @@ async function deployProject(project) {
             fs.mkdirSync(PROJECTS_BASE_PATH, { recursive: true });
         }
 
-        const emitLog = msg => {
-            project.logs += msg + '\n';
-            io.to(project.name).emit('logUpdate', msg + '\n');
-            appendLogToFile(project.path, msg + '\n');
-        };
-
-        emitLog(`==> Cloning from ${project.repoUrl}`);
+        // Removed hardcoded "Cloning from..." message. Real output will be streamed.
         project.status = 'Cloning';
         io.to(project.name).emit('statusUpdate', project.status);
         await executeCommand('git', ['clone', project.repoUrl, project.name], PROJECTS_BASE_PATH, project);
 
-        emitLog(`==> Running build command: '${project.buildCommand}'`);
+        // Removed hardcoded "Running build command..." message. Real output will be streamed.
         project.status = 'Building';
         io.to(project.name).emit('statusUpdate', project.status);
         await executeCommand(project.buildCommand, [], projectPath, project);
-        emitLog('==> Build successful 🎉');
-
-        emitLog(`==> Running start command: '${project.startCommand}'`);
+        
+        // Removed hardcoded "Build successful..." message.
+        
+        // Removed hardcoded "Running start command..." message. Real output will be streamed.
         project.status = 'Starting';
         io.to(project.name).emit('statusUpdate', project.status);
         const port = findAvailablePort();
@@ -275,8 +270,9 @@ async function deployProject(project) {
             project.status = 'LIVE';
             io.to(project.name).emit('statusUpdate', project.status);
             const liveURL = `${BASE_DOMAIN}/${project.name}`;
-            emitLog(`==> Your service is live 🎉`);
-            emitLog(`==> Available at your primary URL ${liveURL}`);
+            project.logs += `\n==> Your service is live 🎉\n==> Available at your primary URL ${liveURL}\n\n`;
+            io.to(project.name).emit('logUpdate', `\n==> Your service is live 🎉\n==> Available at your primary URL ${liveURL}\n\n`);
+            appendLogToFile(project.path, `\n==> Your service is live 🎉\n==> Available at your primary URL ${liveURL}\n\n`);
             project.url = liveURL;
         }, 2000);
 
