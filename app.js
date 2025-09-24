@@ -366,4 +366,3 @@ async function updateProject(project) {
 server.listen(PORT, HOST, () => {
     console.log(`Server running on http://${HOST}:${PORT}`);
 });
-});
