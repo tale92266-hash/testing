@@ -112,8 +112,16 @@ app.use('/:projectName', (req, res, next) => {
 
     const projPath = path.join(PROJECTS_BASE_PATH, projectName);
     
-    if (fs.existsSync(projPath)) {
-        express.static(projPath)(req, res, err => {
+    // Check for common build directories first
+    let servePath = projPath;
+    if (fs.existsSync(path.join(projPath, 'build'))) {
+        servePath = path.join(projPath, 'build');
+    } else if (fs.existsSync(path.join(projPath, 'dist'))) {
+        servePath = path.join(projPath, 'dist');
+    }
+
+    if (fs.existsSync(servePath)) {
+        express.static(servePath)(req, res, err => {
             if (err) {
                 res.status(404).send('File not found');
             }
