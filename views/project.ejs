@@ -152,30 +152,6 @@
         border: 1px solid #014d22;
         box-shadow: 0 0 20px #00ff0080 inset;
     }
-    .refresh-btn {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        color: white;
-        padding: 0.4rem 1rem;
-        border-radius: 10px;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        transition: all 0.3s ease;
-        font-weight: 600;
-    }
-    .refresh-btn:hover {
-        background: rgba(255, 255, 255, 0.2);
-    }
-    @media (max-width: 600px) {
-        main {
-            padding: 1rem;
-        }
-        .project-meta {
-            flex-direction: column;
-        }
-    }
 </style>
 </head>
 <body>
@@ -247,6 +223,7 @@
     const socket = io();
     const projectName = '<%= project.name %>';
     const logsContainer = document.getElementById('logsContainer');
+    const statusBadge = document.querySelector('.status-badge');
 
     socket.emit('joinProjectRoom', projectName);
 
@@ -255,11 +232,36 @@
         logsContainer.scrollTop = logsContainer.scrollHeight;
     });
 
-    socket.on('statusUpdate', (status) => {
-        // Optionally update status badge dynamically if needed
+    socket.on('statusUpdate', (newStatus) => {
+        if (!statusBadge) return;
+        statusBadge.textContent = newStatus.toUpperCase();
+
+        // Clear previous classes
+        statusBadge.className = 'status-badge';
+
+        // Add new status class and icon
+        statusBadge.classList.add('status-' + newStatus.toLowerCase());
+
+        let iconHTML = '';
+        switch(newStatus) {
+            case 'LIVE':
+                iconHTML = '<i class="fas fa-circle"></i>';
+                break;
+            case 'Building':
+            case 'Pending':
+                iconHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                break;
+            case 'Error':
+                iconHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                break;
+            default:
+                iconHTML = '';
+        }
+        statusBadge.innerHTML = iconHTML + ' ' + newStatus.toUpperCase();
     });
 
     logsContainer.scrollTop = logsContainer.scrollHeight;
 </script>
 </body>
+</html>
 </html>
