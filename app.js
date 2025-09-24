@@ -113,6 +113,8 @@ app.use('/:projectName', (req, res, next) => {
 
     const projPath = path.join(PROJECTS_BASE_PATH, projectName);
     let servePath = projPath;
+    
+    // Check for common build directories first
     if (fs.existsSync(path.join(projPath, 'build'))) {
         servePath = path.join(projPath, 'build');
     } else if (fs.existsSync(path.join(projPath, 'dist'))) {
@@ -134,6 +136,8 @@ app.get('/:projectName/*', (req, res, next) => {
     
     const projPath = path.join(PROJECTS_BASE_PATH, projectName);
     let servePath = projPath;
+    
+    // Check for common build directories first
     if (fs.existsSync(path.join(projPath, 'build'))) {
         servePath = path.join(projPath, 'build');
     } else if (fs.existsSync(path.join(projPath, 'dist'))) {
@@ -144,7 +148,8 @@ app.get('/:projectName/*', (req, res, next) => {
     if (fs.existsSync(indexFile)) {
         res.sendFile(indexFile);
     } else {
-        res.status(404).send('File not found in build directory');
+        // If no build directory, serve from the root (for backend apps)
+        next();
     }
 });
 
