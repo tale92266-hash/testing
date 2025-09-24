@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simple Render</title>
+<style>
+body {
+font-family: 'Arial', sans-serif;
+background-color: #f0f2f5;
+color: #333;
+margin: 0;
+padding: 20px;
+}
+.container {
+max-width: 900px;
+margin: 0 auto;
+background-color: #fff;
+padding: 20px;
+border-radius: 8px;
+box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+h1, h2 {
+color: #1a237e;
+}
+form {
+display: grid;
+gap: 15px;
+margin-bottom: 30px;
+}
+input, textarea {
+width: 100%;
+padding: 12px;
+border: 1px solid #ccc;
+border-radius: 6px;
+box-sizing: border-box;
+font-size: 16px;
+}
+button {
+background-color: #43a047;
+color: white;
+padding: 15px;
+border: none;
+border-radius: 6px;
+cursor: pointer;
+font-size: 18px;
+font-weight: bold;
+}
+button:hover {
+background-color: #388e3c;
+}
+.project-card {
+border: 1px solid #e0e0e0;
+padding: 20px;
+border-radius: 8px;
+margin-bottom: 20px;
+background-color: #fafafa;
+box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+.project-card h3 {
+margin-top: 0;
+color: #0d47a1;
+}
+.project-card p {
+margin: 5px 0;
+line-height: 1.5;
+}
+.status {
+font-weight: bold;
+text-transform: capitalize;
+}
+.status.live { color: #4CAF50; }
+.status.building { color: #FFC107; }
+.status.error { color: #F44336; }
+pre {
+background-color: #263238;
+color: #eceff1;
+padding: 10px;
+border-radius: 6px;
+overflow-x: auto;
+white-space: pre-wrap;
+word-wrap: break-word;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Simple Render</h1>
+<p>GitHub repository se app deploy karein.</p>
+    <form action="/deploy" method="POST">
+        <input type="text" name="projectName" placeholder="Project ka Naam" required>
+        <input type="text" name="repoUrl" placeholder="GitHub Repository URL" required>
+        <input type="text" name="buildCommand" placeholder="Build Command (jaise: npm install && npm run build)" required>
+        <input type="text" name="startCommand" placeholder="Start Command (jaise: npm start)" required>
+        <button type="submit">Deploy karein</button>
+    </form>
+
+    <hr>
+
+    <h2>Deployed Apps</h2>
+    <% if (projects.length === 0) { %>
+        <p>Abhi koi app deploy nahi kiya gaya hai.</p>
+    <% } %>
+    <% projects.forEach(project => { %>
+        <div class="project-card">
+            <h3><%= project.name %></h3>
+            <p><strong>URL:</strong> <%= project.url %></p>
+            <p><strong>Path:</strong> <%= project.path %></p>
+            <p><strong>Status:</strong> <span class="status <%= project.status.toLowerCase() %>"><%= project.status %></span></p>
+            <h4>Logs:</h4>
+            <pre><%= project.logs %></pre>
+        </div>
+    <% }); %>
+</div>
+</body>
+</html>
