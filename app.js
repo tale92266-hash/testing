@@ -209,45 +209,18 @@ async function deployProject(project) {
             fs.mkdirSync(PROJECTS_BASE_PATH, { recursive: true });
         }
 
-        const emitLog = msg => {
-            project.logs += msg + '\n';
-            io.to(project.name).emit('logUpdate', msg + '\n');
-            appendLogToFile(project.path, msg + '\n');
-        };
-
-        emitLog('Downloading cache...');
-        emitLog(`==> Cloning from ${project.repoUrl}`);
-
         project.status = 'Cloning';
         io.to(project.name).emit('statusUpdate', project.status);
-
         await executeCommand('git', ['clone', project.repoUrl, project.name], PROJECTS_BASE_PATH, project);
 
-        emitLog(`==> Checking out commit latest in branch main`);
-        emitLog(`==> Transferred 74MB in 7s. Extraction took 3s.`);
-        emitLog('==> Using Node.js version 22.16.0 (default)');
-        emitLog('==> Docs on specifying a Node.js version: https://render.com/docs/node-version');
-
-        emitLog(`==> Running build command '${project.buildCommand}'...`);
         project.status = 'Building';
         io.to(project.name).emit('statusUpdate', project.status);
-
         await executeCommand(project.buildCommand, [], projectPath, project);
-
-        emitLog('==> Uploading build...');
-        emitLog('==> Uploaded in 4.3s. Compression took 1.9s');
-        emitLog('==> Build successful 🎉');
-        emitLog('==> Deploying...');
-
-        emitLog(`==> Running '${project.startCommand}'`);
 
         project.status = 'Starting';
         io.to(project.name).emit('statusUpdate', project.status);
-
         const port = findAvailablePort();
         project.port = port;
-
-        // Override PORT environment variable for child process
         const env = {...process.env, PORT: port.toString()};
         const childProcess = spawn(project.startCommand, [], { 
             cwd: projectPath, 
@@ -280,19 +253,13 @@ async function deployProject(project) {
             }
         });
 
-        // Wait a bit for the process to start
         setTimeout(() => {
             project.status = 'LIVE';
             io.to(project.name).emit('statusUpdate', project.status);
-
-            emitLog('==> Your service is live 🎉');
-            emitLog('==>');
-            emitLog('==> ///////////////////////////////////////////////////////////');
-            emitLog('==>');
-
             const liveURL = `${BASE_DOMAIN}/${project.name}`;
-            emitLog(`==> Available at your primary URL ${liveURL}`);
-
+            project.logs += `\n==> Your service is live 🎉\n==> Available at your primary URL ${liveURL}\n\n`;
+            io.to(project.name).emit('logUpdate', `\n==> Your service is live 🎉\n==> Available at your primary URL ${liveURL}\n\n`);
+            appendLogToFile(project.path, `\n==> Your service is live 🎉\n==> Available at your primary URL ${liveURL}\n\n`);
             project.url = liveURL;
         }, 2000);
 
