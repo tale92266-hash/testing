@@ -1,4 +1,3 @@
-<!-- views/project.ejs - Full Updated for live terminal logs and status -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -225,13 +224,30 @@
     const logsContainer = document.getElementById('logsContainer');
     const statusBadge = document.querySelector('.status-badge');
 
-    socket.emit('joinProjectRoom', projectName);
+    // Function to fetch historical logs
+    async function fetchHistoricalLogs() {
+        try {
+            const response = await fetch(`/project/${projectName}/logs`);
+            if (response.ok) {
+                const logs = await response.text();
+                logsContainer.textContent = logs;
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            } else {
+                console.error('Failed to fetch historical logs');
+            }
+        } catch (error) {
+            console.error('Error fetching logs:', error);
+        }
+    }
 
+    // Call the function on page load to display existing logs
+    fetchHistoricalLogs();
+
+    socket.emit('joinProjectRoom', projectName);
     socket.on('logUpdate', (logMessage) => {
         logsContainer.textContent += logMessage;
         logsContainer.scrollTop = logsContainer.scrollHeight;
     });
-
     socket.on('statusUpdate', (newStatus) => {
         if (!statusBadge) return;
         statusBadge.textContent = newStatus.toUpperCase();
@@ -249,9 +265,6 @@
         }
         statusBadge.innerHTML = iconHTML + ' ' + newStatus.toUpperCase();
     });
-
-    logsContainer.scrollTop = logsContainer.scrollHeight;
 </script>
 </body>
-</html>
 </html>
