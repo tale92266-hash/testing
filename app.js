@@ -1,4 +1,4 @@
-// app.js (complete updated for realtime status and logs)
+// app.js (Complete updated without PM2, realtime logs and status)
 const express = require('express');
 const bodyParser = require('body-parser');
 const { spawn } = require('child_process');
@@ -67,9 +67,7 @@ app.post('/delete-project', async (req, res) => {
 
     const project = projects[projectIndex];
     try {
-        await executeCommand('pm2', ['delete', projectName], project.path, { write: (data) => project.logs += data });
         fs.rmdirSync(project.path, { recursive: true });
-        USED_PORTS.delete(project.port);
         projects.splice(projectIndex, 1);
         res.redirect('/');
     } catch (error) {
@@ -91,12 +89,10 @@ app.post('/webhook', (req, res) => {
 
 app.use('/:projectName', (req, res, next) => {
     const projectName = req.params.projectName;
-
-    const mainRoutes = ['', 'deploy', 'webhook', 'project', 'delete-project', 'projectName']; 
+    const mainRoutes = ['', 'deploy', 'webhook', 'project', 'delete-project', 'projectName'];
     if (mainRoutes.includes(projectName)) {
         return next();
     }
-
     const projectPath = path.join(PROJECTS_BASE_PATH, projectName);
     if (fs.existsSync(projectPath)) {
         express.static(projectPath)(req, res, next);
@@ -112,16 +108,6 @@ io.on('connection', (socket) => {
 });
 
 let projects = [];
-const USED_PORTS = new Set();
-
-function findAvailablePort() {
-    let port = 4000;
-    while(USED_PORTS.has(port)) {
-        port++;
-    }
-    USED_PORTS.add(port);
-    return port;
-}
 
 function executeCommand(command, args, cwd, project) {
     return new Promise((resolve, reject) => {
@@ -147,9 +133,10 @@ function executeCommand(command, args, cwd, project) {
                     const errorMessage = `Exited with status ${code}\n`;
                     project.logs += errorMessage;
                     io.to(project.name).emit('logUpdate', errorMessage);
-                    return reject(new Error(errorMessage));
+                    reject(new Error(errorMessage));
+                } else {
+                    resolve();
                 }
-                resolve();
             });
         } catch (error) {
             const errorMessage = `Command failed to start: ${error.message}\n`;
@@ -163,6 +150,7 @@ function executeCommand(command, args, cwd, project) {
 async function deployProject(project) {
     const projectPath = path.join(PROJECTS_BASE_PATH, project.name);
     project.path = projectPath;
+
     try {
         if (!fs.existsSync(PROJECTS_BASE_PATH)) {
             fs.mkdirSync(PROJECTS_BASE_PATH);
@@ -172,10 +160,7 @@ async function deployProject(project) {
         io.to(project.name).emit('statusUpdate', project.status);
         project.logs = 'Cloning ' + project.repoUrl + '...\n';
         io.to(project.name).emit('logUpdate', project.logs);
-
         await executeCommand('git', ['clone', project.repoUrl, project.name], PROJECTS_BASE_PATH, project);
-
-        project.port = findAvailablePort();
 
         project.status = 'Building';
         io.to(project.name).emit('statusUpdate', project.status);
@@ -185,9 +170,32 @@ async function deployProject(project) {
 
         project.status = 'Starting';
         io.to(project.name).emit('statusUpdate', project.status);
-        project.logs += '\nStarting app with PM2 on port ' + project.port + '\n';
-        io.to(project.name).emit('logUpdate', '\nStarting app with PM2 on port ' + project.port + '\n');
-        await executeCommand(`PORT=${project.port} pm2 start --name ${project.name} -- ${project.startCommand}`, [], projectPath, project);
+        project.logs += '\nRunning start command: ' + project.startCommand + '\n';
+        io.to(project.name).emit('logUpdate', '\nRunning start command: ' + project.startCommand + '\n');
+
+        const childProcess = spawn(project.startCommand, [], { cwd: projectPath, shell: true });
+
+        childProcess.stdout.on('data', (data) => {
+            const logMessage = data.toString();
+            project.logs += logMessage;
+            io.to(project.name).emit('logUpdate', logMessage);
+        });
+
+        childProcess.stderr.on('data', (data) => {
+            const logMessage = `ERROR: ${data.toString()}`;
+            project.logs += logMessage;
+            io.to(project.name).emit('logUpdate', logMessage);
+        });
+
+        childProcess.on('close', (code) => {
+            if (code !== 0) {
+                const errorMessage = `Start command exited with status ${code}\n`;
+                project.logs += errorMessage;
+                io.to(project.name).emit('logUpdate', errorMessage);
+                project.status = 'Error';
+                io.to(project.name).emit('statusUpdate', project.status);
+            }
+        });
 
         project.status = 'LIVE';
         io.to(project.name).emit('statusUpdate', project.status);
@@ -227,9 +235,32 @@ async function updateProject(project) {
 
         project.status = 'Restarting';
         io.to(project.name).emit('statusUpdate', project.status);
-        project.logs += '\nRestarting app with PM2...\n';
-        io.to(project.name).emit('logUpdate', '\nRestarting app with PM2...\n');
-        await executeCommand('pm2', ['restart', project.name], projectPath, project);
+        project.logs += '\nRunning start command: ' + project.startCommand + '\n';
+        io.to(project.name).emit('logUpdate', '\nRunning start command: ' + project.startCommand + '\n');
+
+        const childProcess = spawn(project.startCommand, [], { cwd: projectPath, shell: true });
+
+        childProcess.stdout.on('data', (data) => {
+            const logMessage = data.toString();
+            project.logs += logMessage;
+            io.to(project.name).emit('logUpdate', logMessage);
+        });
+
+        childProcess.stderr.on('data', (data) => {
+            const logMessage = `ERROR: ${data.toString()}`;
+            project.logs += logMessage;
+            io.to(project.name).emit('logUpdate', logMessage);
+        });
+
+        childProcess.on('close', (code) => {
+            if (code !== 0) {
+                const errorMessage = `Start command exited with status ${code}\n`;
+                project.logs += errorMessage;
+                io.to(project.name).emit('logUpdate', errorMessage);
+                project.status = 'Error';
+                io.to(project.name).emit('statusUpdate', project.status);
+            }
+        });
 
         project.status = 'LIVE';
         io.to(project.name).emit('statusUpdate', project.status);
