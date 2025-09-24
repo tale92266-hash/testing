@@ -1,4 +1,4 @@
-// app.js - Complete updated for Render with sub-path serving and persistent realtime logs
+// app.js - Complete fixed for static file serving and port override
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -11,8 +11,8 @@ const server = http.createServer(app);
 const { Server } = require("socket.io");
 const io = new Server(server);
 
-const PORT = process.env.PORT || 3001;
-const HOST = '0.0.0.0'; // Listen on all interfaces for Render
+const PORT = process.env.PORT || 10000;
+const HOST = '0.0.0.0';
 const PROJECTS_BASE_PATH = path.join(__dirname, 'deployments');
 const LOGS_FILE_NAME = 'deployment-logs.txt';
 
@@ -22,32 +22,26 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Serve the main dashboard
+// Main dashboard
 app.get('/', (req, res) => {
     res.render('index', { projects });
 });
 
-// Form to add project
 app.get('/project/add', (req, res) => {
     res.render('add-project');
 });
 
-// Project detail page
 app.get('/project/:projectName', (req, res) => {
     const project = projects.find(p => p.name === req.params.projectName);
     if (!project) return res.status(404).send('Project not found.');
 
-    // On page load, read logs file and send logs content to render initial logs
     const logFilePath = path.join(project.path, LOGS_FILE_NAME);
     fs.readFile(logFilePath, 'utf8', (err, data) => {
-        if (!err) {
-            project.logs = data;
-        }
+        if (!err) project.logs = data;
         res.render('project', { project });
     });
 });
 
-// API to fetch logs file (can be used by frontend AJAX if needed)
 app.get('/project/:projectName/logs', (req, res) => {
     const project = projects.find(p => p.name === req.params.projectName);
     if (!project) return res.status(404).send('Project not found.');
@@ -59,7 +53,6 @@ app.get('/project/:projectName/logs', (req, res) => {
     });
 });
 
-// Add new project and deploy
 app.post('/deploy', (req, res) => {
     const { projectName, repoUrl, buildCommand, startCommand } = req.body;
     if (projects.find(p => p.name === projectName)) {
@@ -81,14 +74,16 @@ app.post('/deploy', (req, res) => {
     deployProject(newProject);
 });
 
-// Delete project
 app.post('/delete-project', async (req, res) => {
     const { projectName } = req.body;
     const index = projects.findIndex(p => p.name === projectName);
     if (index === -1) return res.status(404).send('Project not found.');
 
     try {
-        fs.rmdirSync(projects[index].path, { recursive: true });
+        if (fs.existsSync(projects[index].path)) {
+            fs.rmdirSync(projects[index].path, { recursive: true });
+        }
+        USED_PORTS.delete(projects[index].port);
         projects.splice(index, 1);
         res.redirect('/');
     } catch {
@@ -96,7 +91,6 @@ app.post('/delete-project', async (req, res) => {
     }
 });
 
-// Webhook trigger to update project
 app.post('/webhook', (req, res) => {
     const repoUrl = req.body.repository.html_url;
     const projectToUpdate = projects.find(p => p.repoUrl === repoUrl);
@@ -108,15 +102,28 @@ app.post('/webhook', (req, res) => {
     }
 });
 
-// Serve each project folder as static under /:projectName path (for subdirectory serving)
+// FIXED: Serve project static files properly
 app.use('/:projectName', (req, res, next) => {
     const projectName = req.params.projectName;
+    
+    // Skip main routes
     const mainRoutes = ['', 'deploy', 'webhook', 'project', 'delete-project'];
-    if (mainRoutes.includes(projectName)) return next(); // Main app routes
+    if (mainRoutes.includes(projectName)) return next();
 
     const projPath = path.join(PROJECTS_BASE_PATH, projectName);
+    
     if (fs.existsSync(projPath)) {
-        express.static(projPath)(req, res, next);
+        // Serve static files from the project directory
+        express.static(projPath, {
+            index: ['index.html', 'index.htm'],
+            dotfiles: 'ignore'
+        })(req, res, (err) => {
+            if (err) {
+                res.status(404).send('File not found');
+            } else {
+                next();
+            }
+        });
     } else {
         res.status(404).send('Project not found');
     }
@@ -130,16 +137,19 @@ io.on('connection', socket => {
 
 let projects = [];
 const USED_PORTS = new Set();
-const INITIAL_PORT = 3000;
+const INITIAL_PORT = 1001; // Changed to start from 1001
 
 function findAvailablePort() {
     let port = INITIAL_PORT;
-    while (USED_PORTS.has(port)) port++;
+    while (USED_PORTS.has(port) || port === PORT) {
+        port++;
+    }
     USED_PORTS.add(port);
     return port;
 }
 
 function appendLogToFile(projectPath, log) {
+    if (!fs.existsSync(projectPath)) return;
     const logFilePath = path.join(projectPath, LOGS_FILE_NAME);
     fs.appendFile(logFilePath, log, (err) => {
         if (err) console.error('Failed to append logs:', err);
@@ -201,7 +211,9 @@ async function deployProject(project) {
     project.path = projectPath;
 
     try {
-        if (!fs.existsSync(PROJECTS_BASE_PATH)) fs.mkdirSync(PROJECTS_BASE_PATH);
+        if (!fs.existsSync(PROJECTS_BASE_PATH)) {
+            fs.mkdirSync(PROJECTS_BASE_PATH, { recursive: true });
+        }
 
         const emitLog = msg => {
             project.logs += msg + '\n';
@@ -241,8 +253,13 @@ async function deployProject(project) {
         const port = findAvailablePort();
         project.port = port;
 
+        // Override PORT environment variable for child process
         const env = {...process.env, PORT: port.toString()};
-        const childProcess = spawn(project.startCommand, [], { cwd: projectPath, shell: true, env });
+        const childProcess = spawn(project.startCommand, [], { 
+            cwd: projectPath, 
+            shell: true, 
+            env 
+        });
 
         childProcess.stdout.on('data', data => {
             const msg = data.toString();
@@ -269,19 +286,21 @@ async function deployProject(project) {
             }
         });
 
-        project.status = 'LIVE';
-        io.to(project.name).emit('statusUpdate', project.status);
+        // Wait a bit for the process to start
+        setTimeout(() => {
+            project.status = 'LIVE';
+            io.to(project.name).emit('statusUpdate', project.status);
 
-        emitLog('==> Your service is live 🎉');
-        emitLog('==>');
-        emitLog('==> ///////////////////////////////////////////////////////////');
-        emitLog('==>');
+            emitLog('==> Your service is live 🎉');
+            emitLog('==>');
+            emitLog('==> ///////////////////////////////////////////////////////////');
+            emitLog('==>');
 
-        // Use subpath based URL for Render serving
-        const liveURL = `${BASE_DOMAIN}/${project.name}`;
-        emitLog(`==> Available at your primary URL ${liveURL}`);
+            const liveURL = `${BASE_DOMAIN}/${project.name}`;
+            emitLog(`==> Available at your primary URL ${liveURL}`);
 
-        project.url = liveURL;
+            project.url = liveURL;
+        }, 2000);
 
     } catch (error) {
         project.status = 'Error';
@@ -303,25 +322,27 @@ async function updateProject(project) {
 
     project.status = 'Updating';
     io.to(project.name).emit('statusUpdate', project.status);
-    project.logs += 'Updating ' + project.name + ' from GitHub...\n';
-    io.to(project.name).emit('logUpdate', 'Updating ' + project.name + ' from GitHub...\n');
+    const msg = 'Updating ' + project.name + ' from GitHub...\n';
+    project.logs += msg;
+    io.to(project.name).emit('logUpdate', msg);
 
     try {
         await executeCommand('git', ['pull'], projectPath, project);
 
         project.status = 'Building';
         io.to(project.name).emit('statusUpdate', project.status);
-        project.logs += '\nRe-running build command: ' + project.buildCommand + '\n';
-        io.to(project.name).emit('logUpdate', '\nRe-running build command: ' + project.buildCommand + '\n');
+        const buildMsg = '\nRe-running build command: ' + project.buildCommand + '\n';
+        project.logs += buildMsg;
+        io.to(project.name).emit('logUpdate', buildMsg);
         await executeCommand(project.buildCommand, [], projectPath, project);
 
         project.status = 'Restarting';
         io.to(project.name).emit('statusUpdate', project.status);
-        project.logs += '\nRunning start command: ' + project.startCommand + '\n';
-        io.to(project.name).emit('logUpdate', '\nRunning start command: ' + project.startCommand + '\n');
+        const startMsg = '\nRunning start command: ' + project.startCommand + '\n';
+        project.logs += startMsg;
+        io.to(project.name).emit('logUpdate', startMsg);
 
-        const env = {...process.env, PORT: project.port.toString() || '3000'};
-
+        const env = {...process.env, PORT: project.port.toString()};
         const childProcess = spawn(project.startCommand, [], { cwd: projectPath, shell: true, env });
 
         childProcess.stdout.on('data', (data) => {
